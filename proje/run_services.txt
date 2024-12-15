@@ -1,0 +1,19 @@
+Docker Compose ile başlat:
+docker-compose up --build
+
+Hazır imageler ile:
+docker-compose up
+
+Servislerin durumu:
+docker-compose ps
+
+Logları kontrol et (Opsiyonel):
+docker-compose logs <service_name>
+
+
+Producer'ı başlat:
+python3 app.py 
+
+
+Consumer'ı başlat:
+python3 consumer_app.py 

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kafka Chat</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <style>
+        body {
+            background-color: #043645;
+            color: antiquewhite;
+            text-align: center;
+        }
+        #chat-box {
+            color: black;
+        }
+        .message-left {
+            text-align: left;
+            margin-bottom: 10px;
+        }
+        .message-right {
+            text-align: right;
+            margin-bottom: 10px;
+        }
+        .username {
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        .message-content {
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-5 mt-5" style="background-color: #0f3946; box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2); border-radius: 10px;">
+        <h1 class="mb-4" style="color: antiquewhite;">Kafka Chat</h1>
+        <div id="chat-box" class="border rounded p-3 bg-white mx-auto" style="height: 300px; overflow-y: scroll; margin-bottom: 10px; width: 80%;"></div>
+        <div class="input-group mb-3 mx-auto" style="width: 80%;">
+            <input type="text" id="message" class="form-control" placeholder="Mesajınızı yazın">
+            <button class="btn btn-danger" onclick="sendMessage()">Gönder</button>
+        </div>
+    </div>
+
+    <div class="container text-center mt-4">
+           
+        <h5>Kerim Ayberk Çıtak - 20401870</h5>
+        <h5>Onur Alp Gündüz - 21401958</h5>
+        <h5>Onur Çobanoğlu - 20401879</h5>
+
+    </div>
+
+    <script>
+        const username = "{{ username }}"; // Kullanıcı adı sunucudan alınacak.
+        let lastTimestamp = 0;
+        const displayedMessages = new Set();
+
+        async function sendMessage() {
+            const messageInput = document.getElementById('message');
+            const message = messageInput.value.trim();
+
+            if (!message) {
+                alert('Lütfen bir mesaj girin.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
+                });
+
+                if (response.ok) {
+                    messageInput.value = '';
+                } else {
+                    const errorData = await response.json();
+                    alert('Mesaj gönderilirken hata oluştu: ' + (errorData.error || 'Bilinmeyen hata'));
+                }
+            } catch (error) {
+                alert('Mesaj gönderilirken bir hata oluştu: ' + error.message);
+            }
+        }
+
+        async function receiveMessages() {
+            try {
+                const response = await fetch('/receive?last_timestamp=' + lastTimestamp);
+
+                if (response.ok) {
+                    const messages = await response.json();
+
+                    messages.forEach(msg => {
+                        if (!displayedMessages.has(msg.timestamp)) {
+                            const cssClass = msg.username === username ? "message-right" : "message-left";
+                            addMessageToChatBox(msg.username, msg.message, cssClass);
+                            displayedMessages.add(msg.timestamp);
+                        }
+
+                        if (msg.timestamp > lastTimestamp) {
+                            lastTimestamp = msg.timestamp;
+                        }
+                    });
+                } else {
+                    console.error('Mesajlar alınamadı.');
+                }
+            } catch (error) {
+                console.error('Mesajlar alınırken hata oluştu:', error);
+            }
+        }
+
+        function addMessageToChatBox(user, message, cssClass) {
+            const chatBox = document.getElementById('chat-box');
+            const div = document.createElement('div');
+            div.className = cssClass;
+
+            const usernameSpan = document.createElement('span');
+            usernameSpan.className = "username";
+            usernameSpan.textContent = `${user}:`;
+
+            const messageSpan = document.createElement('span');
+            messageSpan.className = "message-content";
+            messageSpan.textContent = ` ${message}`;
+
+            div.appendChild(usernameSpan);
+            div.appendChild(messageSpan);
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        setInterval(receiveMessages, 2000);
+    </script>
+</body>
+</html>

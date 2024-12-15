@@ -1,0 +1,59 @@
+version: "3.8"  # Docker Compose sürümü
+
+services:
+  mongo:
+    image: mongo:5.0
+    container_name: mongo
+    environment:
+      MONGO_INITDB_DATABASE: chatdb  # MongoDB başlangıç veritabanı
+    ports:
+      - "3003:27017"  # Dışarıdan 3003, içeride varsayılan 27017
+    restart: always
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  kafka:
+    image: confluentinc/cp-kafka:7.0.1
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    depends_on:
+      - zookeeper
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.0.1
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  app:
+    build: .
+    container_name: producer-ui
+    ports:
+      - "5000:5000"  # Flask uygulamasını dış dünyaya açar
+    environment:
+      FLASK_ENV: development
+      MONGO_URI: "mongodb://mongo:27017/"  # Flask'tan MongoDB'ye bağlanmak için URI
+    depends_on:
+      mongo:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    volumes:
+      - .:/app  # Kod değişikliklerinin konteyner içinde anında yansımasını sağlar
+    command: python app.py
