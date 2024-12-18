@@ -22,12 +22,17 @@
             text-align: right;
             margin-bottom: 10px;
         }
-        .username {
-            font-weight: bold;
-            margin-right: 5px;
-        }
-        .message-content {
+        .message-left .message-content, .message-right .message-content {
+            border-radius: 20px;
+            padding: 10px 15px;
             display: inline-block;
+            color: black;
+        }
+        .message-left .message-content {
+            background-color: #d0f0ff; /* Bu renk kullanıcıya özel olarak JavaScript'te değişecek */
+        }
+        .message-right .message-content {
+            background-color: #a8e6a1;
         }
     </style>
 </head>
@@ -42,17 +47,31 @@
     </div>
 
     <div class="container text-center mt-4">
-           
         <h5>Kerim Ayberk Çıtak - 20401870</h5>
         <h5>Onur Alp Gündüz - 21401958</h5>
         <h5>Onur Çobanoğlu - 20401879</h5>
-
     </div>
 
     <script>
         const username = "{{ username }}"; // Kullanıcı adı sunucudan alınacak.
         let lastTimestamp = 0;
         const displayedMessages = new Set();
+        const userColors = {}; // Kullanıcı adlarına özel renkler saklanacak.
+        const notificationSound = new Audio('/sound.wav');
+
+        // Kullanıcıya özel rastgele renk oluşturucu
+        function getUserColor(user) {
+            if (!userColors[user]) {
+                const randomColor = `hsl(${Math.floor(Math.random() * 360)}, 50%, 80%)`;
+                userColors[user] = randomColor;
+            }
+            return userColors[user];
+        }
+
+        // Ses çalma işlemi: İlk kullanıcı etkileşimi sonrasında sesi başlatır
+        document.addEventListener('click', () => {
+            notificationSound.play().catch(() => {});
+        }, { once: true });
 
         async function sendMessage() {
             const messageInput = document.getElementById('message');
@@ -93,6 +112,11 @@
                             const cssClass = msg.username === username ? "message-right" : "message-left";
                             addMessageToChatBox(msg.username, msg.message, cssClass);
                             displayedMessages.add(msg.timestamp);
+
+                            // Eğer left-message ise ses çal
+                            if (cssClass === "message-left") {
+                                notificationSound.play().catch(() => {});
+                            }
                         }
 
                         if (msg.timestamp > lastTimestamp) {
@@ -112,15 +136,14 @@
             const div = document.createElement('div');
             div.className = cssClass;
 
-            const usernameSpan = document.createElement('span');
-            usernameSpan.className = "username";
-            usernameSpan.textContent = `${user}:`;
-
             const messageSpan = document.createElement('span');
             messageSpan.className = "message-content";
-            messageSpan.textContent = ` ${message}`;
+            messageSpan.textContent = `${user}: ${message}`;
 
-            div.appendChild(usernameSpan);
+            if (cssClass === "message-left") {
+                messageSpan.style.backgroundColor = getUserColor(user);
+            }
+
             div.appendChild(messageSpan);
             chatBox.appendChild(div);
             chatBox.scrollTop = chatBox.scrollHeight;

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_from_directory
 from kafka import KafkaProducer, KafkaConsumer
 from pymongo import MongoClient
 import threading
@@ -42,6 +42,10 @@ def consume_messages():
 # Bu thread uygulama başlarken çalışmaya başlayacak
 consumer_thread = threading.Thread(target=consume_messages, daemon=True)
 consumer_thread.start()
+
+@app.route('/sound.wav')
+def serve_sound():
+    return send_from_directory('templates', 'sound.wav')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
