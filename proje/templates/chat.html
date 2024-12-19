@@ -4,129 +4,220 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kafka Chat</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
-            background-color: #043645;
-            color: antiquewhite;
-            text-align: center;
+            background-color: #001a22;
+            color: #ffffff;
         }
-        #chat-box {
-            color: black;
+        .chat-container {
+            display: flex;
+            height: 100vh;
         }
-        .message-left {
-            text-align: left;
-            margin-bottom: 10px;
+        .user-list {
+            width: 25%;
+            background-color: #001a22;
+            border-right: 1px solid #3a3a3a;
+            overflow-y: auto;
         }
-        .message-right {
-            text-align: right;
-            margin-bottom: 10px;
+        .user {
+            padding: 10px;
+            border-bottom: 1px solid #3a3a3a;
+            cursor: pointer;
         }
-        .username {
+        .user.active {
+            background-color: #756e04;
             font-weight: bold;
-            margin-right: 5px;
         }
-        .message-content {
-            display: inline-block;
+        .chat-box {
+            width: 75%;
+            display: flex;
+            flex-direction: column;
         }
+        #messages {
+            flex-grow: 1;
+            padding: 10px;
+            overflow-y: auto;
+            background-color: #043645;
+            color: #ffffff;
+        }
+        .input-group {
+            padding: 10px;
+        }
+
+        .message-container {
+        margin: 5px 0;
+        padding: 10px;
+        border-radius: 10px;
+        max-width: 60%;
+        word-wrap: break-word;
+    }
+
+    .message-left {
+        
+        color: #ecf0f1;
+        text-align: left;
+        align-self: flex-start;
+    }
+
+    .message-right {
+        color: #ffffff;
+        text-align: right;
+        align-self: flex-end;
+    }
     </style>
 </head>
 <body>
-    <div class="container py-5 mt-5" style="background-color: #0f3946; box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2); border-radius: 10px;">
-        <h1 class="mb-4" style="color: antiquewhite;">Kafka Chat</h1>
-        <div id="chat-box" class="border rounded p-3 bg-white mx-auto" style="height: 300px; overflow-y: scroll; margin-bottom: 10px; width: 80%;"></div>
-        <div class="input-group mb-3 mx-auto" style="width: 80%;">
-            <input type="text" id="message" class="form-control" placeholder="Mesajınızı yazın">
-            <button class="btn btn-danger" onclick="sendMessage()">Gönder</button>
+    <div class="chat-container">
+        <!-- Kullanıcı Listesi -->
+        <div class="user-list" id="user-list">
+            <div class="user active" data-recipient="all" onclick="selectRecipient(this)">Genel Sohbet</div>
+            {% for user in users %}
+            {% if user != username %}
+            <div class="user" data-recipient="{{ user }}" onclick="selectRecipient(this)">{{ user }}</div>
+            {% endif %}
+            {% endfor %}
+        </div>
+
+        <!-- Mesajlaşma Alanı -->
+        <div class="chat-box">
+            <div id="messages" style="display: flex; flex-direction: column;"></div>
+            <div class="input-group">
+                <input type="text" id="message" class="form-control" placeholder="Mesajınızı yazın...">
+                <button class="btn btn-success" onclick="sendMessage()">Gönder</button>
+            </div>
         </div>
     </div>
-
-    <div class="container text-center mt-4">
-           
-        <h5>Kerim Ayberk Çıtak - 20401870</h5>
-        <h5>Onur Alp Gündüz - 21401958</h5>
-        <h5>Onur Çobanoğlu - 20401879</h5>
-
-    </div>
-
     <script>
-        const username = "{{ username }}"; // Kullanıcı adı sunucudan alınacak.
-        let lastTimestamp = 0;
-        const displayedMessages = new Set();
+        document.addEventListener("keydown", function (event) {
+  if (event.key === "Enter") {
+    // Çalıştırmak istediğiniz fonksiyonu buraya yazın
+    sendMessage();
+  }
+});
 
-        async function sendMessage() {
-            const messageInput = document.getElementById('message');
-            const message = messageInput.value.trim();
+    </script>
+    <script>
+let selectedRecipient = "all";
+let lastTimestamp = 0;
+const messageCache = {}; // Her sohbet için mesajları saklayacak obje
 
-            if (!message) {
-                alert('Lütfen bir mesaj girin.');
-                return;
-            }
+function selectRecipient(element) {
+    document.querySelectorAll('.user').forEach(el => el.classList.remove('active'));
+    element.classList.add('active');
+    selectedRecipient = element.dataset.recipient;
 
-            try {
-                const response = await fetch('/send', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message })
-                });
+    document.getElementById('messages').innerHTML = ''; // Mesaj kutusunu temizle
+    if (messageCache[selectedRecipient]) {
+        // Önceden saklanan mesajları ekrana getir
+        renderMessages(messageCache[selectedRecipient]);
+    } else {
+        lastTimestamp = 0;
+        fetchMessages(); // Sunucudan yeni mesajları çek
+    }
+}
 
-                if (response.ok) {
-                    messageInput.value = '';
-                } else {
-                    const errorData = await response.json();
-                    alert('Mesaj gönderilirken hata oluştu: ' + (errorData.error || 'Bilinmeyen hata'));
-                }
-            } catch (error) {
-                alert('Mesaj gönderilirken bir hata oluştu: ' + error.message);
+async function sendMessage() {
+    const messageInput = document.getElementById('message');
+    const message = messageInput.value.trim();
+
+    if (!message) return;
+
+    try {
+        const response = await fetch('/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message, recipient: selectedRecipient })
+        });
+
+        if (response.ok) {
+            const timestamp = Date.now() / 1000; // Anlık timestamp
+            const msg = { sender: "{{ username }}", recipient: selectedRecipient, message: message, timestamp: timestamp };
+
+            // Yeni mesajı geçici belleğe ekle
+            if (!messageCache[selectedRecipient]) messageCache[selectedRecipient] = [];
+            messageCache[selectedRecipient].push(msg);
+
+            renderMessages([msg]); // Mesajı ekrana ekle
+            messageInput.value = '';
+        }
+    } catch (error) {
+        console.error('Mesaj gönderilirken hata oluştu:', error);
+    }
+}
+
+const displayedMessages = new Set(); // Görüntülenen mesajların benzersiz timestamp'lerini tutar
+
+
+async function sendMessage() {
+    const messageInput = document.getElementById('message');
+    const message = messageInput.value.trim();
+
+    if (!message) return;
+
+    try {
+        const response = await fetch('/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message, recipient: selectedRecipient })
+        });
+
+        if (response.ok) {
+            messageInput.value = ''; // Mesaj kutusunu temizle
+        }
+    } catch (error) {
+        console.error('Mesaj gönderilirken hata oluştu:', error);
+    }
+}
+
+async function fetchMessages() {
+    try {
+        const response = await fetch(`/receive?last_timestamp=${lastTimestamp}&recipient=${selectedRecipient}`);
+        if (response.ok) {
+            const messages = await response.json();
+            const newMessages = messages.filter(msg => !displayedMessages.has(msg.timestamp));
+
+            if (newMessages.length > 0) {
+                renderMessages(newMessages);
+                newMessages.forEach(msg => displayedMessages.add(msg.timestamp));
+                lastTimestamp = newMessages[newMessages.length - 1].timestamp;
             }
         }
+    } catch (error) {
+        console.error('Mesajlar alınırken hata oluştu:', error);
+    }
+}
+function generateColorFromUsername(username) {
+    const asciiSum = username
+        .split("") // Kullanıcı adını karakterlere ayır
+        .map(char => char.charCodeAt(0)) // Her karakterin ASCII değerini al
+        .reduce((sum, ascii) => sum + ascii, 0); // ASCII değerlerinin toplamını hesapla
 
-        async function receiveMessages() {
-            try {
-                const response = await fetch('/receive?last_timestamp=' + lastTimestamp);
+    // Renk hesaplama (her zaman 0-255 arasında bir RGB değeri üretir)
+    const r = (asciiSum * 31) % 256; // Kırmızı
+    const g = (asciiSum * 67) % 256; // Yeşil
+    const b = (asciiSum * 101) % 256; // Mavi
 
-                if (response.ok) {
-                    const messages = await response.json();
+    return `rgb(${r}, ${g}, ${b})`;
+}
 
-                    messages.forEach(msg => {
-                        if (!displayedMessages.has(msg.timestamp)) {
-                            const cssClass = msg.username === username ? "message-right" : "message-left";
-                            addMessageToChatBox(msg.username, msg.message, cssClass);
-                            displayedMessages.add(msg.timestamp);
-                        }
+function renderMessages(messages) {
+    const messagesDiv = document.getElementById('messages');
+    messages.forEach(msg => {
+        const cssClass = msg.sender === "{{ username }}" ? "message-right" : "message-left";
+        const userColor = generateColorFromUsername(msg.sender); // Kullanıcıya özel rengi hesapla
 
-                        if (msg.timestamp > lastTimestamp) {
-                            lastTimestamp = msg.timestamp;
-                        }
-                    });
-                } else {
-                    console.error('Mesajlar alınamadı.');
-                }
-            } catch (error) {
-                console.error('Mesajlar alınırken hata oluştu:', error);
-            }
-        }
+        // Mesajı container içine yerleştir
+        const messageContainer = document.createElement('div');
+        messageContainer.className = `message-container ${cssClass}`;
+        messageContainer.innerHTML = `<strong style="color: ${userColor}; font-size: 20px;">${msg.sender}-></strong> ${msg.message}`;
 
-        function addMessageToChatBox(user, message, cssClass) {
-            const chatBox = document.getElementById('chat-box');
-            const div = document.createElement('div');
-            div.className = cssClass;
+        messagesDiv.appendChild(messageContainer);
+    });
+    messagesDiv.scrollTop = messagesDiv.scrollHeight; // Otomatik kaydır
+}
 
-            const usernameSpan = document.createElement('span');
-            usernameSpan.className = "username";
-            usernameSpan.textContent = `${user}:`;
-
-            const messageSpan = document.createElement('span');
-            messageSpan.className = "message-content";
-            messageSpan.textContent = ` ${message}`;
-
-            div.appendChild(usernameSpan);
-            div.appendChild(messageSpan);
-            chatBox.appendChild(div);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        setInterval(receiveMessages, 2000);
+setInterval(fetchMessages, 300);
     </script>
 </body>
 </html>

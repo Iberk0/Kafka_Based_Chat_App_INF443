@@ -8,9 +8,11 @@ services:
       MONGO_INITDB_DATABASE: chatdb  # MongoDB başlangıç veritabanı
     ports:
       - "3003:27017"  # Dışarıdan 3003, içeride varsayılan 27017
+    volumes:
+      - mongo_data:/data/db  # MongoDB verilerini kalıcı hale getiren volume
     restart: always
     healthcheck:
-      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]  # MongoDB canlılık kontrolü
       interval: 10s
       timeout: 5s
       retries: 3
@@ -19,41 +21,44 @@ services:
     image: confluentinc/cp-kafka:7.0.1
     container_name: kafka
     ports:
-      - "9092:9092"
+      - "9092:9092"  # Kafka broker bağlantı noktası
     environment:
       KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181  # Zookeeper bağlantı URI'si
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"  # Otomatik konu oluşturma
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
     depends_on:
-      - zookeeper
+      - zookeeper  # Kafka, Zookeeper'a bağlıdır
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.0.1
     container_name: zookeeper
     ports:
-      - "2181:2181"
+      - "2181:2181"  # Zookeeper bağlantı noktası
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_TICK_TIME: 2000  # Zookeeper tick süresi
 
   app:
-    build: .
+    build: .  # Dockerfile kullanarak Flask uygulamasını oluşturur
     container_name: producer-ui
     ports:
       - "5000:5000"  # Flask uygulamasını dış dünyaya açar
     environment:
-      FLASK_ENV: development
+      FLASK_ENV: development  # Flask geliştirme ortamı
       MONGO_URI: "mongodb://mongo:27017/"  # Flask'tan MongoDB'ye bağlanmak için URI
     depends_on:
       mongo:
-        condition: service_healthy
+        condition: service_healthy  # MongoDB sağlıklı olduğunda başlar
       kafka:
-        condition: service_started
+        condition: service_started  # Kafka başlatıldığında başlar
     volumes:
       - .:/app  # Kod değişikliklerinin konteyner içinde anında yansımasını sağlar
-    command: python app.py
+    command: python app.py  # Flask uygulamasını başlatır
+
+volumes:
+  mongo_data:  # MongoDB için volume tanımlaması
